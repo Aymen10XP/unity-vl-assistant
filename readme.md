@@ -342,5 +342,3 @@ data/samples/*.png
 .DS_Store
 Thumbs.db
 ```
-
-This README gives your project a clear identity, sets honest expectations about the hardware constraints, and gives anyone (including future-you) everything needed to run it. Fill in the repository URL and your name where appropriate.
