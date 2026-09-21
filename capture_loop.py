@@ -6,6 +6,8 @@ import requests
 from PIL import Image
 import cv2
 import numpy as np
+from skimage.metrics import structural_similarity as ssim
+
 
 # Configuration
 LM_STUDIO_URL = "http://localhost:1234/v1/chat/completions"
@@ -27,10 +29,10 @@ def frame_to_base64(img):
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 def frames_differ(img1, img2, threshold=0.98):
-    """Simple SSIM comparison. Returns True if frames are meaningfully different."""
+    """Returns True if frames are meaningfully different."""
     arr1 = cv2.cvtColor(np.array(img1), cv2.COLOR_RGB2GRAY)
     arr2 = cv2.cvtColor(np.array(img2), cv2.COLOR_RGB2GRAY)
-    score = cv2.matchTemplate(arr1, arr2, cv2.TM_CCOEFF_NORMED)[0][0]
+    score, _ = ssim(arr1, arr2, full=True)
     return score < threshold
 
 def analyze_frame(img):
