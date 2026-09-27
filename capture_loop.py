@@ -8,13 +8,13 @@ import cv2
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from adviceOverlay import AdviceOverlay
+from AdviceOverlay import AdviceOverlay
 
 # Configuration
 LM_STUDIO_URL = "http://localhost:1234/v1/chat/completions"
-MODEL_NAME = "qwen2.5-vl-3b-instruct"
+MODEL_NAME = "qwen/qwen2.5-vl-7b"
 
-CAPTURE_REGION = {"top": 100, "left": 200, "width": 1280, "height": 720}
+CAPTURE_REGION = {"top": 0, "left": 0, "width": 2560, "height": 1440}
 
 
 def capture_frame(region):

@@ -1,0 +1,14 @@
+mss
+numpy
+opencv-python
+Pillow
+requests
+scikit-image
+fastapi
+uvicorn
+sentence-transformers
+pydantic
+pytest
+httpx
+datasets
+accelerate
