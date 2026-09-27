@@ -1,344 +1,301 @@
-# README.md
+# Unity Beginner Assistant
 
-```markdown
-# Unity VL Assistant
+A lightweight, context-aware Unity tutor for beginners. The learner asks a
+question inside a dockable Unity Editor window, and a locally running Python
+service uses a fine-tuned MiniLM model to retrieve a reviewed, step-by-step
+lesson.
 
-A real-time AI assistant that watches your Unity Editor and gives contextual tips and guidance as you work. Built for beginners learning Unity development.
+V1 does **not** use a generative LLM, a cloud API, or continuous screenshots.
+It runs locally and uses the selected GameObject, its components, project type,
+render pipeline, installed packages, scene, and Play Mode state to improve
+lesson selection.
 
-The assistant captures your screen, detects meaningful changes in the Unity Editor, sends the frame to a locally-running Vision-Language Model (Qwen2.5-VL), and displays helpful advice in a floating overlay window.
+## What V1 includes
 
----
+- A Unity Editor package with a dockable tutor window
+- Natural-language Unity questions
+- 17 structured beginner lessons
+- Context-aware semantic lesson retrieval
+- One instruction at a time
+- Verification checkpoints and common mistakes
+- Clarification choices for ambiguous questions
+- Local thumbs-up/down feedback
+- A reproducible MiniLM fine-tuning pipeline
+- Automated Python tests
 
-## Features
+## How the deep-learning component works
 
-- **Real-time screen monitoring** — Watches the Unity Editor window continuously
-- **Change detection** — Only triggers analysis when the screen meaningfully changes (saves compute)
-- **Offline inference** — Runs entirely on your machine via LM Studio (no API costs, no internet needed)
-- **Contextual advice** — Infers what you're trying to do and suggests next steps
-- **Floating overlay** — Displays tips in an always-on-top window beside Unity
+The project fine-tunes `sentence-transformers/all-MiniLM-L6-v2` using PyTorch
+and Sentence Transformers. Training uses question–lesson pairs with
+`MultipleNegativesRankingLoss`:
 
----
+1. MiniLM converts a learner question and every lesson into dense vectors.
+2. Contrastive training moves matching pairs closer and unrelated pairs apart.
+3. At runtime, normalized dot products rank lessons by cosine similarity.
+4. Small transparent boosts use relevant Unity context without replacing the
+   neural ranking.
 
-## Hardware Requirements
+The model retrieves facts; it does not invent them. The actual instructions are
+stored in `data/beginner_lessons.json`, so lessons can be reviewed and updated
+without retraining for every wording change.
 
-| Component | Minimum | Recommended |
-|---|---|---|
-| **GPU** | NVIDIA with 4GB VRAM | NVIDIA with 8GB+ VRAM |
-| **RAM** | 16GB | 24GB+ |
-| **Storage** | 10GB free | 20GB+ free |
+On the initial held-out set, fine-tuning improved Recall@1 from **88.24%** to
+**94.12%**. The dataset is intentionally small and should be expanded before
+treating this as a final scientific result.
 
-> **Note:** This project is optimized for **low-VRAM setups**. It uses the **Qwen2.5-VL-3B** model at 4-bit quantization, which fits in ~3GB VRAM. The 7B model requires 6GB+ VRAM and is not supported on 4GB cards.
+## Repository layout
 
----
+```text
+unity-vl-assistant/
+├── main.py                         # Starts the local FastAPI service
+├── tutor_service/                  # API, schemas, lesson loader, retriever
+├── training/train_retriever.py     # Fine-tunes and evaluates MiniLM
+├── data/beginner_lessons.json      # Reviewed teaching knowledge
+├── tests/                          # Offline automated tests
+├── unity_package/
+│   └── UnityBeginnerAssistant/     # Package installed into Unity
+├── capture_loop.py                 # Legacy screenshot prototype
+└── requirements.txt
+```
 
-## Software Requirements
+## Requirements
 
-| Software | Version | Purpose |
-|---|---|---|
-| **Python** | 3.10 or 3.11 | Core orchestration code (avoid 3.12+) |
-| **LM Studio** | Latest | Local VLM inference server |
-| **NVIDIA Drivers** | Recent | GPU acceleration |
-| **VSCode** | Latest | Code editing (optional but recommended) |
-| **Unity Editor** | 2021 LTS or newer | The target application |
+- Windows 10 or 11
+- Python 3.10 or 3.11
+- Git
+- Unity 2021.3 or newer
+- Internet access for the first Python dependency/model download
 
----
+A GPU is not required. MiniLM inference runs on CPU. The first model download
+is approximately 90 MB.
 
-## Installation
+## 1. Clone the repository
 
-### 1. Clone the repository
-
-```bash
+```powershell
 git clone https://github.com/Aymen10XP/unity-vl-assistant.git
 cd unity-vl-assistant
 ```
 
-### 2. Set up Python environment
+After V1 is merged, it is available directly from `main`. To inspect the release
+branch before or independently of the merge:
 
-```bash
-# Create virtual environment
+```powershell
+git switch release/v1-unity-tutor
+```
+
+## 2. Create the Python environment
+
+```powershell
 python -m venv .venv
-
-# Activate it
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 3. Install and configure LM Studio
+Using the virtual environment's Python explicitly avoids PowerShell activation
+policy problems.
 
-1. Download **LM Studio** from [lmstudio.ai](https://lmstudio.ai)
-2. In LM Studio, search for **`Qwen2.5-VL-3B-Instruct-GGUF`**
-3. Download the **Q4_K_M** quantization (~2-3GB)
-4. Load the model — monitor VRAM usage in the bottom bar
-   - If VRAM is maxed out, reduce **GPU Layers** in the model settings
-   - Overflow layers will use system RAM automatically
-5. Go to the **Local Server** tab and click **Start Server**
-   - Default port: `1234`
-   - Enable **OpenAI-compatible API**
+## 3. Run the automated tests
 
-### 4. Configure the project
-
-Copy the example config and adjust as needed:
-
-```bash
-cp .env.example .env
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Edit `.env`:
+Expected result:
 
-```env
-LM_STUDIO_URL=http://localhost:1234/v1/chat/completions
-MODEL_NAME=qwen2.5-vl-3b-instruct
-CAPTURE_TOP=100
-CAPTURE_LEFT=200
-CAPTURE_WIDTH=1280
-CAPTURE_HEIGHT=720
-CHANGE_THRESHOLD=0.98
-POLL_INTERVAL=2
+```text
+3 passed
 ```
 
-**Adjust `CAPTURE_*` values to match your Unity Editor window position.** You can use a screenshot tool to find the coordinates.
+## 4. Train the Unity retriever
 
----
+Model artifacts are reproducible and intentionally excluded from Git. Each new
+clone should run the training command once:
 
-## Usage
-
-### 1. Start LM Studio server
-
-Make sure the model is loaded and the local server is running on port `1234`.
-
-### 2. Launch the assistant
-
-```bash
-python src/main.py
+```powershell
+.\.venv\Scripts\python.exe training\train_retriever.py --epochs 4
 ```
 
-You should see:
-```
-Monitoring Unity Editor... (Ctrl+C to stop)
-```
+This command:
 
-### 3. Open Unity and start working
+- downloads the compact MiniLM base model if necessary;
+- creates training and held-out validation pairs;
+- evaluates the generic model;
+- fine-tunes it with contrastive learning;
+- evaluates the fine-tuned model;
+- saves the result under `models/unity-tutor-minilm`;
+- writes `training_metrics.json` beside the model.
 
-The overlay window will appear. When you make a meaningful change in Unity, the assistant will analyze the screen and display advice.
+Training is small enough to run on CPU. Restart the API after retraining so it
+loads the new checkpoint.
 
-### 4. Stop
+If training is skipped, the service still works with generic MiniLM, but it
+will not use the project-specific fine-tuned weights.
 
-Press `Ctrl+C` in the terminal.
+## 5. Start the local tutor service
 
----
-
-## Project Structure
-
-```
-unity-vl-assistant/
-├── src/
-│   ├── main.py              # Entry point — runs the capture loop
-│   ├── capture.py           # Screen capture logic (mss)
-│   ├── change_detect.py     # Frame comparison (SSIM)
-│   ├── vlm_client.py        # LM Studio API client
-│   ├── overlay.py           # Floating advice window (tkinter)
-│   └── config.py            # Loads .env configuration
-├── data/
-│   ├── samples/             # Sample screenshots for testing
-│   └── annotations/         # (Future) labeled training data
-├── notebooks/
-│   └── explore.ipynb        # Testing and experimentation
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
+```powershell
+.\.venv\Scripts\python.exe main.py
 ```
 
----
+Keep this terminal open while using the Unity assistant. Expected output:
 
-## Configuration Reference
+```text
+Uvicorn running on http://127.0.0.1:8765
+```
 
-| Variable | Default | Description |
+Confirm that the service is healthy by opening:
+
+```text
+http://127.0.0.1:8765/health
+```
+
+The response should contain `"status": "ok"` and `"lessons": 17`.
+`model_loaded` is initially false because the model loads lazily on the first
+question.
+
+## 6. Install the package in a Unity project
+
+1. Open the target Unity project.
+2. Open **Window → Package Manager**.
+3. Click the `+` button.
+4. Choose **Add package from disk…**.
+5. Select:
+
+```text
+<cloned-repository>\unity_package\UnityBeginnerAssistant\package.json
+```
+
+6. Wait for Unity to compile the Editor assembly.
+7. Open **Window → Unity Beginner Assistant**.
+
+Because this is a local package reference, changes made in the cloned package
+directory are reflected in the Unity project after **Assets → Refresh**.
+
+## 7. Test the assistant in Unity
+
+1. Make sure `main.py` is still running.
+2. Select a relevant object in the Hierarchy.
+3. Open **Window → Unity Beginner Assistant**.
+4. Enter a question.
+5. Click **Guide me**.
+6. Use **I completed this step** to progress through the lesson.
+7. Expand verification and common mistakes.
+8. Submit feedback using **Yes** or **No**.
+
+Recommended test cases:
+
+| Selected object | Question | Expected lesson |
 |---|---|---|
-| `LM_STUDIO_URL` | `http://localhost:1234/v1/chat/completions` | Local VLM endpoint |
-| `MODEL_NAME` | `qwen2.5-vl-3b-instruct` | Model identifier in LM Studio |
-| `CAPTURE_TOP` | `100` | Top Y coordinate of Unity window |
-| `CAPTURE_LEFT` | `200` | Left X coordinate of Unity window |
-| `CAPTURE_WIDTH` | `1280` | Width of capture region |
-| `CAPTURE_HEIGHT` | `720` | Height of capture region |
-| `CHANGE_THRESHOLD` | `0.98` | SSIM threshold — lower = more sensitive |
-| `POLL_INTERVAL` | `2` | Seconds between screen checks |
+| Main Camera | How do I make the camera follow my player? | `camera_follow` |
+| Cube with Collider | How do I make this object fall? | `rigidbody_3d` |
+| UI Button | How do I run code when this button is clicked? | `ui_button` |
+| Player | How do I move my player with the keyboard? | `basic_movement` |
+| Any configured object | How do I turn this into a prefab? | `create_prefab` |
 
----
+The first question can take slightly longer because the model is loaded into
+memory at that moment. Later questions should be faster.
 
-## How It Works
+## API-only smoke test
 
+With `main.py` running, a colleague can test the trained service without Unity:
+
+```powershell
+$body = @{
+    question = "How do I make the camera follow my player?"
+    context = @{
+        unity_version = "6000.0"
+        project_dimension = "3D"
+        render_pipeline = "UniversalRenderPipelineAsset"
+        active_scene = "SampleScene"
+        selected_object = "Main Camera"
+        selected_components = @("Transform", "Camera", "AudioListener")
+        installed_packages = @("com.unity.cinemachine")
+        is_playing = $false
+    }
+} | ConvertTo-Json -Depth 5
+
+Invoke-RestMethod `
+    -Uri "http://127.0.0.1:8765/ask" `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $body
 ```
-┌─────────────────┐
-│  Unity Editor   │
-└────────┬────────┘
-         │ (screen capture every N seconds)
-         ▼
-┌─────────────────┐
-│ Change Detector │  ← SSIM comparison
-└────────┬────────┘
-         │ (only if changed)
-         ▼
-┌─────────────────┐
-│  VLM Client     │  ← HTTP request to LM Studio
-└────────┬────────┘
-         │ (advice text)
-         ▼
-┌─────────────────┐
-│ Overlay Window  │
-└─────────────────┘
+
+The returned `lesson_id` should be `camera_follow`.
+
+## Feedback and local files
+
+Feedback is appended locally to:
+
+```text
+data/feedback.jsonl
 ```
 
-1. **Capture** — `mss` grabs the Unity Editor window region
-2. **Change detection** — SSIM compares the current frame to the last analyzed frame
-3. **Inference** — If changed, the frame is base64-encoded and sent to the local VLM
-4. **Display** — The model's response appears in a floating overlay
+The following directories/files are intentionally ignored by Git:
 
----
+- `.venv/`
+- `models/`
+- `docs/`
+- `data/feedback.jsonl`
+- Python cache/test cache files
 
 ## Troubleshooting
 
-### "Connection refused" when calling LM Studio
-- Make sure the LM Studio local server is running (green indicator in the Server tab)
-- Verify the port matches `LM_STUDIO_URL` in `.env`
+### The Unity menu does not appear
 
-### Model is very slow (5+ seconds per inference)
-- Reduce `CAPTURE_WIDTH` and `CAPTURE_HEIGHT` — smaller images process faster
-- Increase `POLL_INTERVAL` to reduce query frequency
-- In LM Studio, reduce GPU layers and let more layers use CPU (paradoxically faster if VRAM is saturated)
+- Wait for script compilation to finish.
+- Select **Assets → Refresh**.
+- Check the Unity Console for C# compiler errors.
+- Remove and re-add the package from disk if its local path changed.
+- Restart Unity after package changes when necessary.
 
-### Out of VRAM errors
-- Confirm you downloaded the **Q4_K_M** quantization, not Q8 or FP16
-- Reduce GPU layers in LM Studio settings
-- Close other GPU-heavy apps (browsers, games)
+### Unity says it cannot connect to the tutor API
 
-### Overlay window doesn't stay on top
-- On Windows: right-click the window → "Always on top"
-- On macOS: the `-topmost` attribute works, but some window managers override it
+Start the service from the repository root:
 
-### Advice is generic or unhelpful
-- This is expected with the 3B model on complex scenes
-- Try cropping `CAPTURE_*` to focus on the Inspector panel or Scene view specifically
-- Improve the prompt in `vlm_client.py` — see the prompt engineering section below
-
----
-
-## Prompt Engineering
-
-The quality of advice depends heavily on the prompt. Current prompt in `vlm_client.py`:
-
-```python
-PROMPT = """You are a Unity beginner assistant. Look at this Unity Editor screenshot.
-
-In 2-3 sentences max, tell the user:
-1. What they are most likely trying to do right now
-2. One specific tip or next step
-
-Be concise. Use simple language. Mention Unity panel names explicitly."""
+```powershell
+.\.venv\Scripts\python.exe main.py
 ```
 
-**Tips for improving:**
-- Add context about the user's skill level ("complete beginner")
-- Specify what to do if the user is stuck vs. on track
-- Constrain output length and forbid jargon
-- Include Unity version if behavior differs
+Verify `http://127.0.0.1:8765/health`. The Unity client intentionally connects
+only to localhost.
 
----
+### A question retrieves the wrong lesson
 
-## Roadmap
+- Select the most relevant GameObject before asking.
+- Make the goal more specific.
+- Choose one of the clarification alternatives.
+- Add reviewed question variations to the lesson dataset and retrain.
 
-- [x] Phase 1: Minimum viable prototype (capture → VLM → overlay)
-- [ ] Phase 2: Data collection from Unity tutorials
-- [ ] Phase 3: Fine-tune Qwen2.5-VL on annotated editor screenshots
-- [ ] Phase 4: Prompt engineering and evaluation
-- [ ] Phase 5: Production overlay UI with history and settings
-- [ ] Phase 6: Unity Editor plugin for direct action logging (C#)
+### The first question is slow
 
----
+The neural model loads lazily. This is expected only on the first request after
+starting the service.
 
-## Contributing
+## Reproducing or rolling back the release
 
-This is a learning project. Contributions welcome — especially:
-- Better prompts that produce more useful advice
-- Alternative change detection methods
-- Support for other VLM backends (llama.cpp, Ollama, etc.)
+The V1 work is preserved through feature and release commits. Useful commands:
 
----
+```powershell
+# Inspect history
+git log --oneline --graph --decorate --all
 
-## License
+# Create a safety branch before experimenting
+git switch -c experiment/my-change
 
-MIT License — see `LICENSE` for details.
-
----
-
-## Acknowledgments
-
-- [Qwen2.5-VL](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct) — the vision-language model
-- [LM Studio](https://lmstudio.ai) — local inference runtime
-- [mss](https://python-mss.readthedocs.io/) — fast cross-platform screen capture
+# Return to the V1 release branch
+git switch release/v1-unity-tutor
 ```
 
----
+Avoid deleting model/data changes blindly. Commit source changes on a separate
+branch so they can be reviewed, merged, or reverted safely.
 
-## Suggested `requirements.txt`
+## Current limitations
 
-```txt
-mss>=9.0.1
-Pillow>=10.0.0
-numpy>=1.24.0
-opencv-python>=4.8.0
-requests>=2.31.0
-python-dotenv>=1.0.0
-```
+- The initial knowledge base contains 17 lessons.
+- The held-out evaluation set is small.
+- Confidence thresholds need calibration with more learner questions.
+- V1 does not inspect arbitrary user scripts or diagnose Console errors.
+- Lessons need human review when Unity workflows change.
 
-## Suggested `.env.example`
-
-```env
-# LM Studio configuration
-LM_STUDIO_URL=http://localhost:1234/v1/chat/completions
-MODEL_NAME=qwen2.5-vl-3b-instruct
-
-# Screen capture region (adjust to your Unity window)
-CAPTURE_TOP=100
-CAPTURE_LEFT=200
-CAPTURE_WIDTH=1280
-CAPTURE_HEIGHT=720
-
-# Change detection (SSIM threshold, 0-1, lower = more sensitive)
-CHANGE_THRESHOLD=0.98
-
-# How often to check the screen (seconds)
-POLL_INTERVAL=2
-```
-
-## Suggested `.gitignore`
-
-```gitignore
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-*.egg-info/
-
-# Environment
-.env
-
-# Data
-data/samples/*.jpg
-data/samples/*.png
-!data/samples/.gitkeep
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-```
+Error diagnosis and a larger curriculum are planned for later versions.
