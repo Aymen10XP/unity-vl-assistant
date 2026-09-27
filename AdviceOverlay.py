@@ -2,7 +2,11 @@ import tkinter as tk
 
 
 class AdviceOverlay:
+    """Legacy always-on-top window used by the original screenshot prototype."""
+
     def __init__(self):
+        """Create and style the Tkinter window and its wrapped advice label."""
+
         self.root = tk.Tk()
         self.root.title("Unity Assistant")
         self.root.attributes("-topmost", True)
@@ -21,8 +25,12 @@ class AdviceOverlay:
         self.label.pack(padx=10, pady=10, fill="both", expand=True)
 
     def update(self, text):
+        """Replace visible advice and immediately process pending UI events."""
+
         self.label.config(text=text)
         self.root.update()
 
     def run(self):
+        """Enter Tkinter's event loop until the learner closes the overlay."""
+
         self.root.mainloop()

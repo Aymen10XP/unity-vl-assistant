@@ -9,17 +9,19 @@ import cv2
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from adviceOverlay import AdviceOverlay
+from AdviceOverlay import AdviceOverlay
 
 # ---------------- Configuration ----------------
 LM_STUDIO_URL = "http://localhost:1234/v1/chat/completions"
-MODEL_NAME = "qwen2.5-vl-3b-instruct"
+MODEL_NAME = "qwen/qwen2.5-vl-7b"
 MONITOR_INDEX = 1   # 1 = primary, 0 = all monitors combined
 MAX_IMAGE_SIZE = 1024
 JPEG_QUALITY = 80
 
 
 def capture_frame():
+    """Capture the configured monitor for the legacy vision prototype."""
+
     with mss.MSS() as sct:
         monitor = sct.monitors[MONITOR_INDEX]
         screenshot = sct.grab(monitor)
@@ -28,6 +30,8 @@ def capture_frame():
 
 
 def frame_to_base64(img, max_size=MAX_IMAGE_SIZE, quality=JPEG_QUALITY):
+    """Resize and JPEG-encode a frame to reduce local VLM request cost."""
+
     w, h = img.size
     scale = max_size / max(w, h)
     if scale < 1:
@@ -38,6 +42,8 @@ def frame_to_base64(img, max_size=MAX_IMAGE_SIZE, quality=JPEG_QUALITY):
 
 
 def frames_differ(img1, img2, threshold=0.98):
+    """Use structural similarity to avoid analyzing nearly identical frames."""
+
     arr1 = cv2.cvtColor(np.array(img1), cv2.COLOR_RGB2GRAY)
     arr2 = cv2.cvtColor(np.array(img2), cv2.COLOR_RGB2GRAY)
     score, _ = ssim(arr1, arr2, full=True)
@@ -45,6 +51,8 @@ def frames_differ(img1, img2, threshold=0.98):
 
 
 def analyze_frame(img):
+    """Send one resized screenshot to the legacy local vision endpoint."""
+
     b64 = frame_to_base64(img)
 
     prompt = """You are a Unity beginner assistant. Look at this Unity Editor screenshot.
@@ -79,6 +87,8 @@ Be concise. Use simple language. Mention Unity panel names explicitly."""
 
 
 def main():
+    """Run the original screenshot assistant with responsive worker threads."""
+
     overlay = AdviceOverlay()
     overlay.update("Monitoring screen...\nWaiting for activity.")
 
@@ -86,6 +96,8 @@ def main():
     print("Monitoring screen... (Ctrl+C to stop)")
 
     def loop():
+        """Capture changes on the UI thread and delegate inference to a worker."""
+
         nonlocal last_frame
         try:
             current_frame = capture_frame()
@@ -100,6 +112,8 @@ def main():
             last_frame = current_frame
 
             def worker(frame):
+                """Perform blocking local inference without freezing Tkinter."""
+
                 try:
                     advice = analyze_frame(frame)
                     print(f"ADVICE: {advice}")
