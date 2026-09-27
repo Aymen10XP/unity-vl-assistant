@@ -16,11 +16,15 @@ class TutorRuntime:
     """Lazy model container: startup is instant; the first question loads MiniLM."""
 
     def __init__(self):
+        """Load inexpensive JSON immediately but postpone the neural model."""
+
         self.lessons = load_lessons(LESSONS_PATH)
         self.retriever: LessonRetriever | None = None
         self.lock = Lock()
 
     def get_retriever(self) -> LessonRetriever:
+        """Create the CPU retriever once, safely handling simultaneous first requests."""
+
         if self.retriever is None:
             with self.lock:
                 if self.retriever is None:
@@ -30,11 +34,15 @@ class TutorRuntime:
 
 
 def create_app(runtime: TutorRuntime | None = None) -> FastAPI:
+    """Build the web application; injectable runtime keeps unit testing simple."""
+
     runtime = runtime or TutorRuntime()
     application = FastAPI(title="Unity Beginner Tutor", version="1.0.0")
 
     @application.get("/health")
     def health() -> dict[str, object]:
+        """Report service readiness without forcing the neural model to load."""
+
         return {
             "status": "ok",
             "lessons": len(runtime.lessons),
@@ -44,10 +52,14 @@ def create_app(runtime: TutorRuntime | None = None) -> FastAPI:
 
     @application.post("/ask", response_model=AskResponse)
     def ask(request: AskRequest) -> AskResponse:
+        """Convert one learner question into the highest-ranked grounded lesson."""
+
         return runtime.get_retriever().ask(request.question, request.context)
 
     @application.post("/feedback")
     def feedback(request: FeedbackRequest) -> dict[str, str]:
+        """Append feedback as JSON Lines so every record is independently readable."""
+
         FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
         record = request.model_dump()
         record["created_at"] = datetime.now(timezone.utc).isoformat()

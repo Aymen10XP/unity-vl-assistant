@@ -19,17 +19,23 @@ class UnityContext(BaseModel):
 
 
 class AskRequest(BaseModel):
+    """Question and Editor context sent from the Unity package to Python."""
+
     question: str = Field(min_length=3, max_length=1000)
     context: UnityContext = Field(default_factory=UnityContext)
 
 
 class Alternative(BaseModel):
+    """One possible lesson shown when the question is ambiguous."""
+
     lesson_id: str
     title: str
     score: float
 
 
 class AskResponse(BaseModel):
+    """Complete grounded lesson response rendered by the Unity Editor window."""
+
     request_id: str
     lesson_id: str
     title: str
@@ -45,6 +51,8 @@ class AskResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
+    """Learner rating stored locally for evaluation and future improvement."""
+
     request_id: str
     lesson_id: str
     question: str

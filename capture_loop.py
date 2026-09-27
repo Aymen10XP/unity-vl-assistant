@@ -18,6 +18,8 @@ CAPTURE_REGION = {"top": 0, "left": 0, "width": 2560, "height": 1440}
 
 
 def capture_frame(region):
+    """Capture one configured screen rectangle and convert it to a PIL image."""
+
     with mss.mss() as sct:
         screenshot = sct.grab(region)
         img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
@@ -25,12 +27,16 @@ def capture_frame(region):
 
 
 def frame_to_base64(img):
+    """Compress a screenshot as JPEG and encode it for an API JSON payload."""
+
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG", quality=85)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def frames_differ(img1, img2, threshold=0.98):
+    """Use structural similarity to decide whether the screen changed enough."""
+
     arr1 = cv2.cvtColor(np.array(img1), cv2.COLOR_RGB2GRAY)
     arr2 = cv2.cvtColor(np.array(img2), cv2.COLOR_RGB2GRAY)
     score, _ = ssim(arr1, arr2, full=True)
@@ -38,6 +44,8 @@ def frames_differ(img1, img2, threshold=0.98):
 
 
 def analyze_frame(img):
+    """Send one screenshot to the legacy local vision-language endpoint."""
+
     b64 = frame_to_base64(img)
     prompt = """You are a Unity beginner assistant. Look at this Unity Editor screenshot.
 
@@ -68,6 +76,8 @@ Be concise. Use simple language. Mention Unity panel names explicitly."""
 
 
 def main():
+    """Run the original screenshot prototype and its floating Tkinter overlay."""
+
     overlay = AdviceOverlay()
     overlay.update("Monitoring Unity Editor...\nWaiting for activity.")
 
@@ -76,6 +86,8 @@ def main():
 
     # Schedule the capture loop as a background task so tkinter stays responsive
     def loop():
+        """Capture, detect changes, analyze, and schedule the next legacy cycle."""
+
         nonlocal last_frame
         current_frame = capture_frame(CAPTURE_REGION)
 

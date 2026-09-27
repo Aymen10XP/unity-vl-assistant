@@ -27,6 +27,8 @@ def sentence_transformer_encoder(model_name_or_path: str) -> Encoder:
     model = SentenceTransformer(model_name_or_path, device="cpu")
 
     def encode(texts: list[str]) -> np.ndarray:
+        """Convert text into normalized float vectors used for cosine similarity."""
+
         return np.asarray(
             model.encode(texts, normalize_embeddings=True, show_progress_bar=False),
             dtype=np.float32,
@@ -36,15 +38,26 @@ def sentence_transformer_encoder(model_name_or_path: str) -> Encoder:
 
 
 class LessonRetriever:
+    """Rank lessons semantically, then adapt the winner with transparent rules."""
+
     def __init__(self, lessons: list[Lesson], encoder: Encoder):
+        """Store lessons and precompute their embeddings once for fast questions."""
+
         self.lessons = lessons
         self.encoder = encoder
         # Lesson vectors never change at runtime, so calculate them only once.
         self.lesson_embeddings = encoder([lesson.retrieval_text for lesson in lessons])
 
     def ask(self, question: str, context: UnityContext) -> AskResponse:
+        """Find the best lesson and package it for the step-by-step Unity UI."""
+
+        # The selected object and project type help distinguish otherwise similar
+        # questions such as 2D physics versus 3D physics.
         query = self._contextual_query(question, context)
         query_vector = self.encoder([query])[0]
+
+        # Because all vectors are normalized, a dot product is cosine similarity.
+        # Context boosts are intentionally small so semantics remains dominant.
         semantic_scores = self.lesson_embeddings @ query_vector
         scores = semantic_scores + self._context_boosts(question, context)
         ranked = np.argsort(scores)[::-1]
@@ -55,7 +68,9 @@ class LessonRetriever:
         second_score = float(scores[int(ranked[1])]) if len(ranked) > 1 else 0.0
         margin = best_score - second_score
 
-        # Thresholds should later be calibrated against a held-out validation set.
+        # Low absolute confidence or a small gap between the first two results
+        # means the system should ask instead of pretending to be certain.
+        # These thresholds should later be calibrated on a larger validation set.
         needs_clarification = best_score < 0.34 or margin < 0.025
         alternatives = [
             Alternative(
@@ -87,6 +102,8 @@ class LessonRetriever:
 
     @staticmethod
     def _contextual_query(question: str, context: UnityContext) -> str:
+        """Turn the question and safe Unity metadata into one embedding input."""
+
         components = ", ".join(context.selected_components) or "none"
         return (
             f"Beginner Unity question: {question}\n"
@@ -115,6 +132,8 @@ class LessonRetriever:
 
     @staticmethod
     def _context_notes(lesson: Lesson, context: UnityContext) -> list[str]:
+        """Create deterministic warnings without asking a language model to invent them."""
+
         notes: list[str] = []
         existing = {item.lower() for item in context.selected_components}
         missing = [item for item in lesson.component_hints if item.lower() not in existing]

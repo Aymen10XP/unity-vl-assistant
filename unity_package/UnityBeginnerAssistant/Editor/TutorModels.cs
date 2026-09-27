@@ -4,6 +4,7 @@ namespace UnityBeginnerAssistant.Editor
 {
     // JsonUtility serializes public fields. Snake-case field names deliberately
     // match the Python API, avoiding an additional JSON dependency in Unity.
+    /// <summary>Safe Editor facts that improve lesson selection.</summary>
     [Serializable]
     public class UnityContextPayload
     {
@@ -17,6 +18,7 @@ namespace UnityBeginnerAssistant.Editor
         public bool is_playing;
     }
 
+    /// <summary>Body sent to POST /ask.</summary>
     [Serializable]
     public class AskRequestPayload
     {
@@ -24,6 +26,7 @@ namespace UnityBeginnerAssistant.Editor
         public UnityContextPayload context;
     }
 
+    /// <summary>A candidate lesson offered when the question is ambiguous.</summary>
     [Serializable]
     public class AlternativePayload
     {
@@ -32,6 +35,7 @@ namespace UnityBeginnerAssistant.Editor
         public float score;
     }
 
+    /// <summary>Grounded lesson and UI state returned by the Python service.</summary>
     [Serializable]
     public class AskResponsePayload
     {
@@ -49,6 +53,7 @@ namespace UnityBeginnerAssistant.Editor
         public AlternativePayload[] alternatives;
     }
 
+    /// <summary>Small local rating used to measure and improve usefulness.</summary>
     [Serializable]
     public class FeedbackPayload
     {

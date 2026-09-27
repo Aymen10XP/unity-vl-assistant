@@ -20,6 +20,8 @@ def keyword_encoder(texts: list[str]) -> np.ndarray:
 
 
 def test_camera_question_retrieves_camera_lesson():
+    """Verify that ranking routes a clear camera question to the camera lesson."""
+
     retriever = LessonRetriever(load_lessons(LESSONS_PATH), keyword_encoder)
     result = retriever.ask(
         "How can the camera follow my player?",
@@ -30,6 +32,8 @@ def test_camera_question_retrieves_camera_lesson():
 
 
 def test_play_mode_produces_context_warning():
+    """Verify that context rules warn beginners about temporary Play Mode edits."""
+
     retriever = LessonRetriever(load_lessons(LESSONS_PATH), keyword_encoder)
     result = retriever.ask(
         "How do I create a prefab?",

@@ -13,8 +13,14 @@ namespace UnityBeginnerAssistant.Editor
     /// </summary>
     public static class UnityContextCollector
     {
+        /// <summary>
+        /// Build a snapshot at question time. Collection is event-driven rather
+        /// than continuous, which keeps Editor overhead effectively zero while idle.
+        /// </summary>
         public static UnityContextPayload Capture()
         {
+            // Component type names reveal useful state without sending scene files,
+            // component values, or user source code to the service.
             GameObject selected = Selection.activeGameObject;
             string[] components = selected == null
                 ? new string[0]
@@ -38,6 +44,8 @@ namespace UnityBeginnerAssistant.Editor
                 packages = new string[0];
             }
 
+            // Project-level fields help select pipeline-, package-, and dimension-
+            // appropriate instructions while remaining small and explainable.
             return new UnityContextPayload
             {
                 unity_version = Application.unityVersion,

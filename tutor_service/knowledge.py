@@ -7,6 +7,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Lesson:
+    """Typed representation of one reviewed lesson from the JSON knowledge base."""
+
     id: str
     title: str
     summary: str
@@ -35,6 +37,8 @@ class Lesson:
 
 
 def load_lessons(path: Path) -> list[Lesson]:
+    """Read lesson JSON, convert records to typed objects, and reject duplicate IDs."""
+
     raw = json.loads(path.read_text(encoding="utf-8"))
     lessons = [Lesson(**item) for item in raw]
     ids = [lesson.id for lesson in lessons]

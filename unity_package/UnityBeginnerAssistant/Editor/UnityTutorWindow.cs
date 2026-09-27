@@ -10,6 +10,8 @@ namespace UnityBeginnerAssistant.Editor
     /// </summary>
     public class UnityTutorWindow : EditorWindow
     {
+        // These fields are the complete UI state: the learner's question, network
+        // progress, retrieved lesson, current teaching step, and optional sections.
         private string question = "";
         private string status = "Start the Python service, then ask a Unity question.";
         private bool waiting;
@@ -19,6 +21,7 @@ namespace UnityBeginnerAssistant.Editor
         private bool showVerification;
         private bool showMistakes;
 
+        /// <summary>Create or focus the dockable assistant from Unity's Window menu.</summary>
         [MenuItem("Window/Unity Beginner Assistant")]
         public static void ShowWindow()
         {
@@ -27,6 +30,7 @@ namespace UnityBeginnerAssistant.Editor
             window.minSize = new Vector2(380, 420);
         }
 
+        /// <summary>Render the question form, current status, and lesson every repaint.</summary>
         private void OnGUI()
         {
             scroll = EditorGUILayout.BeginScrollView(scroll);
@@ -54,6 +58,10 @@ namespace UnityBeginnerAssistant.Editor
             EditorGUILayout.EndScrollView();
         }
 
+        /// <summary>
+        /// Present a lesson progressively: ambiguity first, then one actionable
+        /// step, verification, mistakes, and feedback.
+        /// </summary>
         private void DrawAnswer()
         {
             EditorGUILayout.Space(10);
@@ -64,6 +72,8 @@ namespace UnityBeginnerAssistant.Editor
 
             DrawStringList("Project context", answer.context_notes, MessageType.Warning);
 
+            // Low-confidence retrieval must ask the learner rather than presenting
+            // an uncertain lesson as fact.
             if (answer.needs_clarification)
             {
                 EditorGUILayout.HelpBox(answer.clarification, MessageType.Question);
@@ -81,6 +91,8 @@ namespace UnityBeginnerAssistant.Editor
                 return;
             }
 
+            // Only one step is emphasized at a time to reduce cognitive load for a
+            // beginner. Previous/next navigation remains under learner control.
             if (answer.steps != null && answer.steps.Length > 0)
             {
                 currentStep = Mathf.Clamp(currentStep, 0, answer.steps.Length - 1);
@@ -121,6 +133,7 @@ namespace UnityBeginnerAssistant.Editor
             EditorGUILayout.EndHorizontal();
         }
 
+        /// <summary>Render API-generated context warnings as Unity help boxes.</summary>
         private static void DrawStringList(string title, string[] values, MessageType type)
         {
             if (values == null || values.Length == 0) return;
@@ -128,6 +141,7 @@ namespace UnityBeginnerAssistant.Editor
                 EditorGUILayout.HelpBox($"{title}: {value}", type);
         }
 
+        /// <summary>Render simple readable bullet lists for checks and mistakes.</summary>
         private static void DrawBullets(string[] values)
         {
             if (values == null) return;
@@ -135,6 +149,10 @@ namespace UnityBeginnerAssistant.Editor
                 EditorGUILayout.LabelField("• " + value, EditorStyles.wordWrappedLabel);
         }
 
+        /// <summary>
+        /// Capture context, call Python asynchronously, and reset the lesson UI to
+        /// its first step. Errors become visible instructions instead of exceptions.
+        /// </summary>
         private async void AskQuestion()
         {
             waiting = true;
@@ -160,6 +178,7 @@ namespace UnityBeginnerAssistant.Editor
             }
         }
 
+        /// <summary>Persist the learner's rating locally for later evaluation.</summary>
         private async void SendFeedback(bool useful)
         {
             try

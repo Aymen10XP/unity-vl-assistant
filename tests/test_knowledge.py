@@ -3,6 +3,8 @@ from tutor_service.knowledge import load_lessons
 
 
 def test_lesson_library_is_well_formed():
+    """Protect the service from empty lessons, duplicate IDs, or missing guidance."""
+
     lessons = load_lessons(LESSONS_PATH)
     assert len(lessons) >= 15
     assert len({lesson.id for lesson in lessons}) == len(lessons)

@@ -46,6 +46,10 @@ def recall_metrics(
     lessons: list[Lesson],
     validation: list[tuple[str, int]],
 ) -> dict[str, float]:
+    """Measure where each correct lesson appears in the semantic ranking."""
+
+    # Encode every lesson and held-out question using the same normalized vector
+    # space used by the production retriever.
     lesson_vectors = model.encode(
         [lesson.retrieval_text for lesson in lessons], normalize_embeddings=True
     )
@@ -70,6 +74,9 @@ def recall_metrics(
 
 
 def main() -> None:
+    """Run reproducible baseline evaluation, fine-tuning, and final evaluation."""
+
+    # Command-line arguments make experiments repeatable in the project report.
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=16)
@@ -77,11 +84,15 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=FINE_TUNED_MODEL_PATH)
     args = parser.parse_args()
 
+    # First establish the pretrained baseline on exactly the same validation set
+    # that will be used after training.
     lessons = load_lessons(LESSONS_PATH)
     train_examples, validation = split_examples(lessons, args.seed)
     model = SentenceTransformer(BASE_MODEL_NAME)
     baseline = recall_metrics(model, lessons, validation)
 
+    # Multiple-negatives loss makes the matching lesson positive and treats the
+    # other lessons in each batch as negative examples.
     loader = DataLoader(train_examples, shuffle=True, batch_size=args.batch_size)
     loss = losses.MultipleNegativesRankingLoss(model)
     warmup_steps = max(1, int(len(loader) * args.epochs * 0.1))
@@ -93,6 +104,7 @@ def main() -> None:
         show_progress_bar=True,
     )
 
+    # Save both the reusable model and before/after metrics for honest evaluation.
     trained = recall_metrics(model, lessons, validation)
     report = {
         "base_model": BASE_MODEL_NAME,
