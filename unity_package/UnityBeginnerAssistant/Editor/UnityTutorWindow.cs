@@ -76,7 +76,9 @@ namespace UnityBeginnerAssistant.Editor
             // an uncertain lesson as fact.
             if (answer.needs_clarification)
             {
-                EditorGUILayout.HelpBox(answer.clarification, MessageType.Question);
+                // Unity help boxes support Info, Warning, Error, and None. Info is
+                // the appropriate non-error style for a clarification question.
+                EditorGUILayout.HelpBox(answer.clarification, MessageType.Info);
                 if (answer.alternatives != null)
                 {
                     foreach (AlternativePayload alternative in answer.alternatives)

@@ -34,7 +34,9 @@ namespace UnityBeginnerAssistant.Editor
             try
             {
                 // Package lookup happens only when the learner asks a question.
-                packages = PackageInfo.GetAllRegisteredPackages()
+                // Unity 6000 also defines UnityEditor.PackageInfo, so the complete
+                // namespace prevents an ambiguous-type compiler error.
+                packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
                     .Select(package => package.name)
                     .ToArray();
             }
