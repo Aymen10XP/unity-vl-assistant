@@ -47,6 +47,7 @@ namespace UnityBeginnerAssistant.Editor
             {
                 request.uploadHandler = new UploadHandlerRaw(body);
                 request.downloadHandler = new DownloadHandlerBuffer();
+                request.timeout = 15;
                 request.SetRequestHeader("Content-Type", "application/json");
                 UnityWebRequestAsyncOperation operation = request.SendWebRequest();
 

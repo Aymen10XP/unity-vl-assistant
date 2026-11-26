@@ -57,11 +57,14 @@ def analyze_frame(img):
 
     prompt = """You are a Unity beginner assistant. Look at this Unity Editor screenshot.
 
-In 2-3 sentences max, tell the user:
-1. What they are most likely trying to do right now
-2. One specific tip or next step
+Return a short, clearly formatted answer using exactly these labels:
+Trying to do:
+- Name the likely goal in one sentence.
 
-Be concise. Use simple language. Mention Unity panel names explicitly."""
+Next step:
+- Give one specific, beginner-friendly action.
+
+Mention Unity panel names explicitly and do not add extra sections."""
 
     payload = {
         "model": MODEL_NAME,
@@ -84,6 +87,31 @@ Be concise. Use simple language. Mention Unity panel names explicitly."""
         print("BODY:", response.text)
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
+
+
+def format_advice_result(text):
+    """Normalize model text so the legacy overlay is easy to scan."""
+
+    text = " ".join(str(text).split())
+    if not text:
+        return "No advice was returned."
+
+    lowered = text.lower()
+    trying_markers = ("trying to do:", "what they are trying to do:")
+    next_markers = ("next step:", "one specific tip:")
+
+    trying_index = next((lowered.find(marker) for marker in trying_markers if lowered.find(marker) >= 0), -1)
+    next_index = next((lowered.find(marker) for marker in next_markers if lowered.find(marker) >= 0), -1)
+
+    if trying_index >= 0 and next_index > trying_index:
+        trying_marker = next(marker for marker in trying_markers if lowered.find(marker) == trying_index)
+        next_marker = next(marker for marker in next_markers if lowered.find(marker) == next_index)
+        trying = text[trying_index + len(trying_marker):next_index].strip(" -:\n")
+        next_step = text[next_index + len(next_marker):].strip(" -:\n")
+        if trying and next_step:
+            return f"TRYING TO DO\n{trying}\n\nNEXT STEP\n{next_step}"
+
+    return text
 
 
 def main():
@@ -116,8 +144,9 @@ def main():
 
                 try:
                     advice = analyze_frame(frame)
-                    print(f"ADVICE: {advice}")
-                    overlay.root.after(0, lambda a=advice: overlay.update(a))
+                    formatted_advice = format_advice_result(advice)
+                    print(f"ADVICE:\n{formatted_advice}")
+                    overlay.root.after(0, lambda a=formatted_advice: overlay.update(a))
                 except Exception as e:
                     err = str(e)
                     print(f"Error: {err}")

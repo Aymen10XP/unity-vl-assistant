@@ -20,6 +20,8 @@ namespace UnityBeginnerAssistant.Editor
         private Vector2 scroll;
         private bool showVerification;
         private bool showMistakes;
+        private bool serviceConnectionError;
+        private string technicalError = "";
 
         /// <summary>Create or focus the dockable assistant from Unity's Window menu.</summary>
         [MenuItem("Window/Unity Beginner Assistant")]
@@ -60,7 +62,35 @@ namespace UnityBeginnerAssistant.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
+            EditorGUILayout.HelpBox(status,
+                waiting ? MessageType.Info :
+                answer != null ? MessageType.None : MessageType.Info);
+
+            if (serviceConnectionError)
+            {
+                EditorGUILayout.HelpBox(
+                    "The tutor service is not reachable at http://127.0.0.1:8765.\n\n" +
+                    "1. Open a terminal in the cloned unity-vl-assistant folder.\n" +
+                    "2. Run the command below.\n" +
+                    "3. Keep that terminal open and click Retry.",
+                    MessageType.Error);
+
+                EditorGUILayout.TextField(
+                    ".venv\\Scripts\\python.exe main.py",
+                    EditorStyles.textField);
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Copy start command"))
+                    GUIUtility.systemCopyBuffer = ".venv\\Scripts\\python.exe main.py";
+                if (GUILayout.Button("Retry"))
+                    AskQuestion();
+                EditorGUILayout.EndHorizontal();
+
+                showVerification = EditorGUILayout.Foldout(
+                    showVerification, "Technical connection details", false);
+                if (showVerification)
+                    EditorGUILayout.HelpBox(technicalError, MessageType.None);
+            }
 
             if (answer != null)
                 DrawAnswer();
@@ -75,9 +105,9 @@ namespace UnityBeginnerAssistant.Editor
         private void DrawAnswer()
         {
             EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Recommended lesson", EditorStyles.boldLabel);
             EditorGUILayout.LabelField(answer.title, EditorStyles.largeLabel);
-            EditorGUILayout.LabelField(
-                $"Match confidence: {answer.confidence:P0}", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField(GetConfidenceLabel(answer.confidence), EditorStyles.miniLabel);
             EditorGUILayout.HelpBox(answer.summary, MessageType.None);
 
             DrawStringList("Project context", answer.context_notes, MessageType.Warning);
@@ -93,7 +123,9 @@ namespace UnityBeginnerAssistant.Editor
                 {
                     foreach (AlternativePayload alternative in answer.alternatives)
                     {
-                        if (GUILayout.Button(alternative.title))
+                        if (GUILayout.Button(
+                            $"{alternative.title}  ({alternative.score:P0} match)",
+                            GUILayout.MinHeight(28)))
                         {
                             question = "Teach me how to " + alternative.title;
                             AskQuestion();
@@ -110,7 +142,8 @@ namespace UnityBeginnerAssistant.Editor
                 currentStep = Mathf.Clamp(currentStep, 0, answer.steps.Length - 1);
                 EditorGUILayout.Space(8);
                 EditorGUILayout.LabelField(
-                    $"Step {currentStep + 1} of {answer.steps.Length}", EditorStyles.boldLabel);
+                    $"Current step  •  {currentStep + 1} of {answer.steps.Length}", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("DO THIS", EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(answer.steps[currentStep], MessageType.Info);
 
                 EditorGUILayout.BeginHorizontal();
@@ -120,16 +153,20 @@ namespace UnityBeginnerAssistant.Editor
 
                 if (currentStep < answer.steps.Length - 1)
                 {
-                    if (GUILayout.Button("I completed this step")) currentStep++;
+                    if (GUILayout.Button("I completed this step  →", GUILayout.MinHeight(28))) currentStep++;
                 }
                 else if (GUILayout.Button("All steps completed"))
                 {
                     showVerification = true;
                 }
                 EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.Space(4);
+                DrawStepProgress(answer.steps.Length);
             }
 
-            showVerification = EditorGUILayout.Foldout(showVerification, "How to verify it worked", true);
+            showVerification = EditorGUILayout.Foldout(
+                showVerification, "How to verify it worked", true);
             if (showVerification)
                 DrawBullets(answer.verification);
 
@@ -140,8 +177,35 @@ namespace UnityBeginnerAssistant.Editor
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Was this lesson useful?", EditorStyles.miniLabel);
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Yes")) SendFeedback(true);
-            if (GUILayout.Button("No")) SendFeedback(false);
+            if (GUILayout.Button("Yes, this helped")) SendFeedback(true);
+            if (GUILayout.Button("No, try another result")) SendFeedback(false);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>Turn the retrieval score into a plain-language confidence label.</summary>
+        private static string GetConfidenceLabel(float confidence)
+        {
+            if (confidence >= 0.70f)
+                return $"Strong match  •  {confidence:P0}";
+            if (confidence >= 0.50f)
+                return $"Possible match  •  {confidence:P0}";
+            return $"Low confidence  •  {confidence:P0}";
+        }
+
+        /// <summary>Show how far the learner has moved through the lesson.</summary>
+        private void DrawStepProgress(int stepCount)
+        {
+            if (stepCount <= 1) return;
+
+            EditorGUILayout.BeginHorizontal();
+            for (int index = 0; index < stepCount; index++)
+            {
+                GUIStyle style = index == currentStep
+                    ? EditorStyles.boldLabel
+                    : EditorStyles.miniLabel;
+                GUILayout.Label(index <= currentStep ? "●" : "○", style,
+                    GUILayout.Width(18));
+            }
             EditorGUILayout.EndHorizontal();
         }
 
@@ -168,6 +232,8 @@ namespace UnityBeginnerAssistant.Editor
         private async void AskQuestion()
         {
             waiting = true;
+            serviceConnectionError = false;
+            technicalError = "";
             answer = null;
             status = "Collecting Unity context and retrieving a lesson...";
             Repaint();
@@ -177,17 +243,36 @@ namespace UnityBeginnerAssistant.Editor
                 currentStep = 0;
                 showVerification = false;
                 showMistakes = false;
-                status = $"Matched local lesson: {answer.lesson_id}";
+                status = answer.needs_clarification
+                    ? "A few lessons could fit. Choose the closest goal below."
+                    : $"Lesson ready: {answer.title}";
             }
             catch (Exception exception)
             {
-                status = exception.Message + "\nRun: .venv\\Scripts\\python.exe main.py";
+                technicalError = exception.Message;
+                serviceConnectionError = IsConnectionError(exception.Message);
+                status = serviceConnectionError
+                    ? "Tutor service is not running."
+                    : $"The tutor could not complete the request.";
             }
             finally
             {
                 waiting = false;
                 Repaint();
             }
+        }
+
+        /// <summary>Distinguish a stopped local service from API or lesson errors.</summary>
+        private static bool IsConnectionError(string error)
+        {
+            if (string.IsNullOrEmpty(error)) return false;
+            string text = error.ToLowerInvariant();
+            return text.Contains("cannot connect") ||
+                   text.Contains("connection refused") ||
+                   text.Contains("could not resolve") ||
+                   text.Contains("destination host") ||
+                   text.Contains("network is unreachable") ||
+                   text.Contains("timed out");
         }
 
         /// <summary>Reset all lesson state so the learner can start a fresh question.</summary>
@@ -198,6 +283,8 @@ namespace UnityBeginnerAssistant.Editor
             currentStep = 0;
             showVerification = false;
             showMistakes = false;
+            serviceConnectionError = false;
+            technicalError = "";
             scroll = Vector2.zero;
             status = "Ready for a new Unity question.";
             Repaint();
