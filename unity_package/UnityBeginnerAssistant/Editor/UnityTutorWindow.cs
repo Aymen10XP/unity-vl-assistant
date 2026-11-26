@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -22,6 +23,33 @@ namespace UnityBeginnerAssistant.Editor
         private bool showMistakes;
         private bool serviceConnectionError;
         private string technicalError = "";
+        private UnityContextPayload liveContext;
+
+        private void OnEnable()
+        {
+            Selection.selectionChanged += RefreshLiveContext;
+            EditorApplication.hierarchyChanged += RefreshLiveContext;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            RefreshLiveContext();
+        }
+
+        private void OnDisable()
+        {
+            Selection.selectionChanged -= RefreshLiveContext;
+            EditorApplication.hierarchyChanged -= RefreshLiveContext;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        }
+
+        private void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            RefreshLiveContext();
+        }
+
+        private void RefreshLiveContext()
+        {
+            liveContext = UnityContextCollector.CaptureVisibleContext();
+            Repaint();
+        }
 
         /// <summary>Create or focus the dockable assistant from Unity's Window menu.</summary>
         [MenuItem("Window/Unity Beginner Assistant")]
@@ -42,6 +70,8 @@ namespace UnityBeginnerAssistant.Editor
                 "Ask what you want to accomplish. The tutor uses the selected GameObject " +
                 "and project context to retrieve a verified local lesson.",
                 MessageType.Info);
+
+            DrawLiveContextCard();
 
             EditorGUILayout.LabelField("What do you want to do?");
             question = EditorGUILayout.TextArea(question, GUILayout.MinHeight(56));
@@ -96,6 +126,123 @@ namespace UnityBeginnerAssistant.Editor
                 DrawAnswer();
 
             EditorGUILayout.EndScrollView();
+        }
+
+        /// <summary>
+        /// Make the context already used by retrieval visible and immediately useful.
+        /// Suggestions are local heuristics; the service is contacted only on click.
+        /// </summary>
+        private void DrawLiveContextCard()
+        {
+            if (liveContext == null)
+                RefreshLiveContext();
+
+            EditorGUILayout.Space(4);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField("Currently observing", EditorStyles.boldLabel);
+
+            bool hasSelection = !string.IsNullOrEmpty(liveContext.selected_object);
+            string target = hasSelection ? liveContext.selected_object : "No GameObject selected";
+            string mode = liveContext.is_playing ? "Play Mode" : "Edit Mode";
+            EditorGUILayout.LabelField(
+                $"{target}  |  {liveContext.project_dimension}  |  {ShortPipelineName(liveContext.render_pipeline)}  |  {mode}",
+                EditorStyles.wordWrappedLabel);
+
+            if (hasSelection && liveContext.selected_components != null &&
+                liveContext.selected_components.Length > 0)
+            {
+                EditorGUILayout.LabelField(
+                    "Components: " + string.Join(", ", liveContext.selected_components),
+                    EditorStyles.wordWrappedMiniLabel);
+            }
+            else if (!hasSelection)
+            {
+                EditorGUILayout.LabelField(
+                    "Select an object in the Hierarchy for tailored suggestions.",
+                    EditorStyles.wordWrappedMiniLabel);
+            }
+
+            List<string> suggestions = BuildQuickQuestions(liveContext);
+            if (suggestions.Count > 0)
+            {
+                EditorGUILayout.Space(3);
+                EditorGUILayout.LabelField("Quick questions", EditorStyles.miniBoldLabel);
+                EditorGUI.BeginDisabledGroup(waiting);
+                foreach (string suggestion in suggestions)
+                {
+                    if (GUILayout.Button("Ask: " + suggestion, GUILayout.MinHeight(24)))
+                    {
+                        question = suggestion;
+                        AskQuestion();
+                    }
+                }
+                EditorGUI.EndDisabledGroup();
+            }
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(6);
+        }
+
+        private static string ShortPipelineName(string pipeline)
+        {
+            if (string.IsNullOrEmpty(pipeline) || pipeline == "unknown")
+                return "Unknown pipeline";
+            if (pipeline.Contains("Universal")) return "URP";
+            if (pipeline.Contains("HDRender") || pipeline.Contains("HighDefinition")) return "HDRP";
+            return pipeline;
+        }
+
+        /// <summary>Offer at most three relevant prompts based on component names.</summary>
+        private static List<string> BuildQuickQuestions(UnityContextPayload context)
+        {
+            List<string> suggestions = new List<string>();
+            if (context == null || string.IsNullOrEmpty(context.selected_object))
+            {
+                suggestions.Add("How do I create and organize a GameObject?");
+                return suggestions;
+            }
+
+            HashSet<string> components = new HashSet<string>(
+                context.selected_components ?? Array.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            AddSuggestion(components.Contains("Camera"),
+                "How do I make this camera follow my player?", suggestions);
+            AddSuggestion(components.Contains("Rigidbody") || components.Contains("Rigidbody2D"),
+                "How do I debug physics on this object?", suggestions);
+            AddSuggestion(components.Contains("Button"),
+                "How do I run code when this button is clicked?", suggestions);
+            AddSuggestion(components.Contains("Animator"),
+                "How do I create an animation transition for this object?", suggestions);
+            AddSuggestion(components.Contains("AudioSource"),
+                "How do I play and control audio on this object?", suggestions);
+            AddSuggestion(components.Contains("Light"),
+                "How do I improve the lighting from this object?", suggestions);
+            AddSuggestion(HasCollider(components),
+                "Why might this object pass through other objects?", suggestions);
+
+            if (suggestions.Count == 0)
+                suggestions.Add("What can I add to this GameObject?");
+
+            if (suggestions.Count > 3)
+                suggestions.RemoveRange(3, suggestions.Count - 3);
+            return suggestions;
+        }
+
+        private static bool HasCollider(HashSet<string> components)
+        {
+            foreach (string component in components)
+            {
+                if (component.IndexOf("Collider", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void AddSuggestion(bool condition, string suggestion, List<string> suggestions)
+        {
+            if (condition && suggestions.Count < 3)
+                suggestions.Add(suggestion);
         }
 
         /// <summary>

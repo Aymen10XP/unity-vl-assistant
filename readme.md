@@ -13,6 +13,7 @@ lesson selection.
 ## What V1 includes
 
 - A Unity Editor package with a dockable tutor window
+- A live context card with component-aware quick questions
 - Natural-language Unity questions
 - 44 structured beginner lessons across core Unity workflows
 - Context-aware semantic lesson retrieval

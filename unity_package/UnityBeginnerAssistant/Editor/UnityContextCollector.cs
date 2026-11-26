@@ -14,10 +14,19 @@ namespace UnityBeginnerAssistant.Editor
     public static class UnityContextCollector
     {
         /// <summary>
+        /// Capture the inexpensive facts shown in the live Editor card. Package
+        /// discovery is intentionally skipped until a learner submits a question.
+        /// </summary>
+        public static UnityContextPayload CaptureVisibleContext()
+        {
+            return Capture(includePackages: false);
+        }
+
+        /// <summary>
         /// Build a snapshot at question time. Collection is event-driven rather
         /// than continuous, which keeps Editor overhead effectively zero while idle.
         /// </summary>
-        public static UnityContextPayload Capture()
+        public static UnityContextPayload Capture(bool includePackages = true)
         {
             // Component type names reveal useful state without sending scene files,
             // component values, or user source code to the service.
@@ -30,20 +39,23 @@ namespace UnityBeginnerAssistant.Editor
                     .Distinct()
                     .ToArray();
 
-            string[] packages;
-            try
+            string[] packages = new string[0];
+            if (includePackages)
             {
-                // Package lookup happens only when the learner asks a question.
-                // Unity 6000 also defines UnityEditor.PackageInfo, so the complete
-                // namespace prevents an ambiguous-type compiler error.
-                packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
-                    .Select(package => package.name)
-                    .ToArray();
-            }
-            catch
-            {
-                // Tutor guidance still works if Package Manager is refreshing.
-                packages = new string[0];
+                try
+                {
+                    // Package lookup happens only when the learner asks a question.
+                    // Unity 6000 also defines UnityEditor.PackageInfo, so the complete
+                    // namespace prevents an ambiguous-type compiler error.
+                    packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
+                        .Select(package => package.name)
+                        .ToArray();
+                }
+                catch
+                {
+                    // Tutor guidance still works if Package Manager is refreshing.
+                    packages = new string[0];
+                }
             }
 
             // Project-level fields help select pipeline-, package-, and dimension-

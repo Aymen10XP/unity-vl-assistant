@@ -1,6 +1,6 @@
 {
   "name": "com.unity-beginner-assistant.tutor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Unity Beginner Assistant",
   "description": "A context-aware, local semantic-retrieval tutor for Unity beginners.",
   "unity": "2021.3",
