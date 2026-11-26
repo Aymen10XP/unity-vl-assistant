@@ -44,10 +44,20 @@ namespace UnityBeginnerAssistant.Editor
             EditorGUILayout.LabelField("What do you want to do?");
             question = EditorGUILayout.TextArea(question, GUILayout.MinHeight(56));
 
+            EditorGUILayout.BeginHorizontal();
             EditorGUI.BeginDisabledGroup(waiting || string.IsNullOrWhiteSpace(question));
             if (GUILayout.Button(waiting ? "Finding the best lesson..." : "Guide me"))
                 AskQuestion();
             EditorGUI.EndDisabledGroup();
+
+            EditorGUI.BeginDisabledGroup(waiting || (answer == null && string.IsNullOrEmpty(question)));
+            if (GUILayout.Button("Clear / New question", GUILayout.Width(145)))
+            {
+                ClearQuestion();
+                GUI.FocusControl(null);
+            }
+            EditorGUI.EndDisabledGroup();
+            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(6);
             EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
@@ -178,6 +188,19 @@ namespace UnityBeginnerAssistant.Editor
                 waiting = false;
                 Repaint();
             }
+        }
+
+        /// <summary>Reset all lesson state so the learner can start a fresh question.</summary>
+        private void ClearQuestion()
+        {
+            question = "";
+            answer = null;
+            currentStep = 0;
+            showVerification = false;
+            showMistakes = false;
+            scroll = Vector2.zero;
+            status = "Ready for a new Unity question.";
+            Repaint();
         }
 
         /// <summary>Persist the learner's rating locally for later evaluation.</summary>

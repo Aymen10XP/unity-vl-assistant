@@ -1,10 +1,3 @@
-"""Fine-tune MiniLM to match beginner questions with the correct Unity lesson.
-
-This is the project's custom deep-learning training step. Multiple-negatives
-ranking loss treats every other lesson in a batch as a negative example and
-uses backpropagation to improve the transformer's semantic vector space.
-"""
-
 from __future__ import annotations
 
 import argparse

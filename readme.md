@@ -14,9 +14,10 @@ lesson selection.
 
 - A Unity Editor package with a dockable tutor window
 - Natural-language Unity questions
-- 17 structured beginner lessons
+- 44 structured beginner lessons across core Unity workflows
 - Context-aware semantic lesson retrieval
 - One instruction at a time
+- A Clear / New question action that resets the lesson and progress
 - Verification checkpoints and common mistakes
 - Clarification choices for ambiguous questions
 - Local thumbs-up/down feedback
@@ -39,9 +40,9 @@ The model retrieves facts; it does not invent them. The actual instructions are
 stored in `data/beginner_lessons.json`, so lessons can be reviewed and updated
 without retraining for every wording change.
 
-On the initial held-out set, fine-tuning improved Recall@1 from **88.24%** to
-**94.12%**. The dataset is intentionally small and should be expanded before
-treating this as a final scientific result.
+On the expanded held-out set, fine-tuning improved Recall@1 from **93.18%** to
+**97.73%**, with Recall@3 at **100%**. The dataset is still intentionally
+compact and should be expanded before treating this as a final scientific result.
 
 ## Repository layout
 
@@ -149,7 +150,7 @@ Confirm that the service is healthy by opening:
 http://127.0.0.1:8765/health
 ```
 
-The response should contain `"status": "ok"` and `"lessons": 17`.
+The response should contain `"status": "ok"` and `"lessons": 44`.
 `model_loaded` is initially false because the model loads lazily on the first
 question.
 
@@ -292,8 +293,8 @@ branch so they can be reviewed, merged, or reverted safely.
 
 ## Current limitations
 
-- The initial knowledge base contains 17 lessons.
-- The held-out evaluation set is small.
+- The knowledge base contains 44 lessons and should continue growing with user feedback.
+- The held-out evaluation set has one paraphrase per lesson and remains relatively small.
 - Confidence thresholds need calibration with more learner questions.
 - V1 does not inspect arbitrary user scripts or diagnose Console errors.
 - Lessons need human review when Unity workflows change.

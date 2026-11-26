@@ -1,7 +1,10 @@
 .venv/
+.venv-broken/
+.uv-cache/
 __pycache__/
 *.py[cod]
 docs/
 models/
 data/feedback.jsonl
 .pytest_cache/
+deliverables/*.docx
